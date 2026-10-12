@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "Maximilian-Maag.tmux",
+  "name": "Tmux",
+  "version": "0.1.0",
+  "author": "Maximilian-Maag",
+  "license": "MIT",
+  "description": "Themes the installed tmux from the applied Omarchy theme: reads the live colors.toml and generates a tmux theme conf (status bar, active/inactive window, selection, accent) that your own tmux.conf sources, plus a Hyprland keybinding.",
+  "kinds": [
+    "cli",
+    "hyprland-module"
+  ],
+  "activation": "auto",
+  "entryPoints": {},
+  "omarchy_meta": {
+    "installScript": "install.sh",
+    "hooks": [
+      "theme-set"
+    ],
+    "features": [
+      "Reads the applied theme live from ~/.local/state/omarchy/current/theme/colors.toml — no baked-in palette, any theme works",
+      "Generates ~/.config/tmux/omarchy-theme.conf (status bar, active/inactive window, selection, accent, pane borders)",
+      "Writes to a dedicated file so your existing ~/.config/tmux/tmux.conf is never modified beyond a source-file line",
+      "theme-set hook regenerates and reloads the conf on every theme change",
+      "Hyprland keybinding (Super+Shift+Alt+T) opens a tmux session in a floating terminal",
+      "status reports the applied theme, the generated file and the tmux version"
+    ]
+  }
+}
