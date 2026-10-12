@@ -44,6 +44,19 @@ class CliIntegration(unittest.TestCase):
         return subprocess.run([sys.executable, str(CLI), *args],
                               capture_output=True, text=True, env=self.env, **kwargs)
 
+    def test_bindings_reports_a_missing_bindings_file(self):
+        # plugin_dir() is derived from the CLI's own path, so run a copy of the CLI
+        # out of a temp checkout that has no bin/bindings.lua: it must fail (rc 1)
+        # rather than silently claiming success.
+        stray = self.base / "stray" / "bin"
+        stray.mkdir(parents=True)
+        copy = stray / "omarchy-tmux"
+        copy.write_text(CLI.read_text())
+        proc = subprocess.run([sys.executable, str(copy), "bindings"],
+                              capture_output=True, text=True, env=self.env)
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertIn("bindings.lua not found", proc.stderr)
+
     def test_theme_writes_dedicated_conf(self):
         proc = self.run_cli("theme")
         self.assertEqual(proc.returncode, 0, proc.stderr)
