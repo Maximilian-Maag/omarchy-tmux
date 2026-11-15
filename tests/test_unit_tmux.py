@@ -409,8 +409,42 @@ class Commands(unittest.TestCase):
 
 
 class TmuxVersion(unittest.TestCase):
-    def test_returns_a_string(self):
-        self.assertIsInstance(tmux.tmux_version(), str)
+    """The assertIsInstance(str) form could never fail — every return path is a
+    str. These distinguish the success result from the not-installed sentinel.
+    """
+
+    def test_reports_the_installed_version(self):
+        captured = {}
+
+        class Result:
+            stdout = "tmux 3.4\n"
+
+        def fake(argv, **kwargs):
+            captured["argv"] = argv
+            captured["kwargs"] = kwargs
+            return Result()
+
+        real = tmux.subprocess.run
+        tmux.subprocess.run = fake
+        try:
+            self.assertEqual(tmux.tmux_version(), "tmux 3.4")
+        finally:
+            tmux.subprocess.run = real
+        self.assertEqual(captured["argv"], ["tmux", "-V"])
+        # The call must capture output as text, or stdout comes back as bytes.
+        self.assertIs(captured["kwargs"].get("text"), True)
+        self.assertIs(captured["kwargs"].get("capture_output"), True)
+
+    def test_reports_not_installed_when_tmux_is_absent(self):
+        real = tmux.subprocess.run
+
+        def boom(*a, **k):
+            raise FileNotFoundError("no tmux")
+        tmux.subprocess.run = boom
+        try:
+            self.assertEqual(tmux.tmux_version(), "not installed")
+        finally:
+            tmux.subprocess.run = real
 
 
 if __name__ == "__main__":
