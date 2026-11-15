@@ -75,5 +75,23 @@ bash "$INSTALL" >"$SANDBOX/install2.log" 2>&1
 n="$(grep -c "source-file" "$TMUX_DIR/tmux.conf")"
 if (( n == 1 )); then ok "idempotent: one source-file line"; else bad "duplicated source line ($n)"; fi
 
+# a custom conf_path (OMARCHY_TMUX_CONFIG) is the file generated AND sourced
+# (regression for #1: the installer must resolve conf_path from the config).
+CUSTOM_CONF="$SANDBOX/custom.json"
+printf '{ "conf_path": "tmux/custom-theme.conf" }\n' > "$CUSTOM_CONF"
+rm -f "$XDG_CONFIG_HOME/tmux/custom-theme.conf"
+echo "# fresh tmux.conf" > "$TMUX_DIR/tmux.conf"
+OMARCHY_TMUX_CONFIG="$CUSTOM_CONF" bash "$INSTALL" >"$SANDBOX/install3.log" 2>&1
+if [[ -f "$XDG_CONFIG_HOME/tmux/custom-theme.conf" ]]; then
+  ok "install generated the overridden conf_path"
+else
+  bad "install ignored the overridden conf_path"; cat "$SANDBOX/install3.log"
+fi
+if grep -q "custom-theme.conf" "$TMUX_DIR/tmux.conf"; then
+  ok "install sourced the overridden conf_path"
+else
+  bad "install wrote the wrong source-file line"; cat "$TMUX_DIR/tmux.conf"
+fi
+
 echo
 if (( fail == 0 )); then echo "shell: all $pass passed"; exit 0; else echo "shell: $fail failed"; exit 1; fi

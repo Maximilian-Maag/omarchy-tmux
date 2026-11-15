@@ -124,6 +124,14 @@ class CliIntegration(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertTrue((self.base / "elsewhere/theme.conf").is_file())
 
+    def test_paths_reports_the_resolved_conf_path(self):
+        # install.sh and the hook read this, so an override must show here too.
+        cfg = self.base / "tmux.json"
+        cfg.write_text(json.dumps({"conf_path": str(self.base / "elsewhere/theme.conf")}))
+        proc = self.run_cli("--config", str(cfg), "paths")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("conf_path=%s" % (self.base / "elsewhere/theme.conf"), proc.stdout)
+
     def test_generated_conf_is_valid_tmux(self):
         self.run_cli("theme")
         conf = self.config / "tmux/omarchy-theme.conf"

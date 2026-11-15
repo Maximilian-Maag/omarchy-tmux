@@ -4,6 +4,15 @@ set -euo pipefail
 
 PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Optional config override, passed through to every CLI invocation. The shell
+# tests use it to prove a custom config/tmux.json is honoured end to end; a
+# normal user runs the installer bare and the plugin's own config/tmux.json is
+# used.
+CLI_ARGS=()
+if [[ -n "${OMARCHY_TMUX_CONFIG:-}" ]]; then
+  CLI_ARGS=(--config "$OMARCHY_TMUX_CONFIG")
+fi
+
 echo "omarchy-tmux: installing from $PLUGIN_DIR"
 
 # ── 1. Validate the plugin ────────────────────────────────────────────────────
@@ -26,23 +35,32 @@ else
 fi
 
 # ── 3. Generate the theme conf now ────────────────────────────────────────────
-"$BIN_SRC" theme || echo "  WARNING: no applied theme yet — run 'omarchy-tmux theme' later."
+"$BIN_SRC" "${CLI_ARGS[@]}" theme || echo "  WARNING: no applied theme yet — run 'omarchy-tmux theme' later."
 
 # ── 4. Make the user's tmux.conf source our file (never clobber it) ───────────
+# The path comes from the CLI (config/tmux.json's conf_path), so a custom
+# conf_path is honoured rather than silently ignored. Nothing the user wrote is
+# ever destroyed: the line is appended at most once, guarded against duplicates.
 TMUX_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/tmux"
 TMUX_CONF="$TMUX_DIR/tmux.conf"
-SOURCE_LINE="source-file ${XDG_CONFIG_HOME:-$HOME/.config}/tmux/omarchy-theme.conf"
+PATHS="$("$BIN_SRC" "${CLI_ARGS[@]}" paths 2>/dev/null || true)"
+CONF_PATH="$(printf '%s\n' "$PATHS" | sed -n 's/^conf_path=//p')"
+if [[ -z "$CONF_PATH" ]]; then
+  echo "  WARNING: could not read conf_path from the CLI — using the built-in default."
+  CONF_PATH="$TMUX_DIR/omarchy-theme.conf"
+fi
+SOURCE_LINE="source-file $CONF_PATH"
 mkdir -p "$TMUX_DIR"
 if [[ -f "$TMUX_CONF" ]]; then
-  if grep -q "omarchy-theme.conf" "$TMUX_CONF"; then
-    echo "  tmux.conf already sources omarchy-theme.conf."
+  if grep -qF "$SOURCE_LINE" "$TMUX_CONF" || grep -q "omarchy-theme.conf" "$TMUX_CONF"; then
+    echo "  tmux.conf already sources $CONF_PATH."
   else
     printf '\n# omarchy-tmux theme\n%s\n' "$SOURCE_LINE" >> "$TMUX_CONF"
     echo "  Added source-file to $TMUX_CONF (your config is otherwise untouched)."
   fi
 else
   printf '# omarchy-tmux theme\n%s\n' "$SOURCE_LINE" > "$TMUX_CONF"
-  echo "  Created $TMUX_CONF sourcing omarchy-theme.conf."
+  echo "  Created $TMUX_CONF sourcing $CONF_PATH."
 fi
 
 # ── 5. Theme-set hook (uniquely named to avoid basename collisions) ───────────
@@ -56,13 +74,9 @@ fi
 HYPR_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
 HYPR_MAIN="$HYPR_CONFIG_DIR/hyprland.lua"
 if [[ -f "$HYPR_MAIN" ]]; then
-  cp "$PLUGIN_DIR/bin/bindings.lua" "$HYPR_CONFIG_DIR/tmux-bindings.lua"
-  if ! grep -q "tmux-bindings" "$HYPR_MAIN"; then
-    printf '\n-- omarchy-tmux keybindings\nrequire("hypr.tmux-bindings")\n' >> "$HYPR_MAIN"
-    echo "  Wired keybindings into $HYPR_MAIN"
-  else
-    echo "  Keybindings already wired (updated)."
-  fi
+  # The CLI renders bin/bindings.lua with the configured `keybinding`, so the
+  # installed module always matches config/tmux.json.
+  "$BIN_SRC" "${CLI_ARGS[@]}" bindings
 else
   echo "  WARNING: $HYPR_MAIN not found — add: require(\"hypr.tmux-bindings\")"
 fi

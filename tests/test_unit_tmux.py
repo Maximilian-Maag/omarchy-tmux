@@ -349,6 +349,13 @@ class Commands(unittest.TestCase):
         self.assertTrue(dest.is_file())
         self.assertIn("o.bind", dest.read_text())
 
+    def test_paths_command_reports_conf_path(self):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = tmux.main(["paths"])
+        self.assertEqual(rc, 0)
+        self.assertIn("conf_path=%s" % tmux.theme_conf_path(), buf.getvalue())
+
 
 class TmuxVersion(unittest.TestCase):
     def test_returns_a_string(self):

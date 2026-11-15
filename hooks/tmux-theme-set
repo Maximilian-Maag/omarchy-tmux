@@ -33,13 +33,22 @@ if [[ -z "$PLUGIN" ]]; then
   exit
 fi
 
+# Optional config override, passed through to every CLI invocation so a custom
+# config/tmux.json is honoured end to end (the shell tests use it to prove it).
+CLI_ARGS=()
+if [[ -n "${OMARCHY_TMUX_CONFIG:-}" ]]; then
+  CLI_ARGS=(--config "$OMARCHY_TMUX_CONFIG")
+fi
+
 CLI="$PLUGIN/bin/omarchy-tmux"
-if ! "$CLI" theme &>/dev/null; then
+if ! "$CLI" "${CLI_ARGS[@]}" theme &>/dev/null; then
   : # theme generation failed; nothing more to do
 fi
 
-# Reload the running tmux server, if there is one. Never start one.
-CONF="${XDG_CONFIG_HOME:-$HOME/.config}/tmux/omarchy-theme.conf"
+# Reload the running tmux server, if there is one. Never start one. Resolve the
+# generated file's path from the CLI (config/tmux.json's conf_path) so a custom
+# conf_path is the file reloaded, not a hardcoded default this plugin never wrote.
+CONF="$("$CLI" "${CLI_ARGS[@]}" paths 2>/dev/null | sed -n 's/^conf_path=//p')"
 if [[ -f "$CONF" ]] && tmux list-sessions &>/dev/null; then
   tmux source-file "$CONF" &>/dev/null || true
 fi

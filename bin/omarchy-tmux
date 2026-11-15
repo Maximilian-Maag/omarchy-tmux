@@ -285,6 +285,18 @@ def cmd_bindings(args) -> int:
     return 0
 
 
+def cmd_paths(args) -> int:
+    """Print the resolved generated-conf path as ``conf_path=<path>``.
+
+    install.sh and the theme-set hook read this so the ``source-file`` line and
+    the reload path always match what ``theme`` writes — a custom ``conf_path``
+    in config/tmux.json is then honoured everywhere, not only by the CLI.
+    """
+    cfg = load_config(args.config)
+    print("conf_path=%s" % theme_conf_path(cfg))
+    return 0
+
+
 def cmd_status(args) -> int:
     cfg = load_config(args.config)
     colors_path = theme_colors_path()
@@ -314,6 +326,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     bindings = sub.add_parser("bindings", help="install the Hyprland keybinding module")
     bindings.set_defaults(func=cmd_bindings)
+
+    paths = sub.add_parser("paths", help="print the resolved generated-conf path")
+    paths.set_defaults(func=cmd_paths)
 
     status = sub.add_parser("status", help="report the applied theme and generated file")
     status.set_defaults(func=cmd_status)

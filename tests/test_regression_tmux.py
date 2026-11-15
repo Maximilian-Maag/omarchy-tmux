@@ -96,6 +96,25 @@ class DedicatedConfPath(unittest.TestCase):
         self.assertIn('>> "$TMUX_CONF"', text)
 
 
+class ConfPathSingleSourceOfTruth(unittest.TestCase):
+    """HAZARD: conf_path was honoured by the CLI but hardcoded in the hook and
+    install.sh, so an override regenerated a file the hook then failed to
+    source (a theme change silently did not reload tmux). Both must ask the CLI.
+    """
+
+    def test_hook_resolves_conf_path_from_the_cli(self):
+        text = (ROOT / "hooks/tmux-theme-set").read_text()
+        self.assertIn('"$CLI" "${CLI_ARGS[@]}" paths', text)
+        self.assertIn("conf_path=", text)
+        # The old hardcoded default path must be gone.
+        self.assertNotIn("tmux/omarchy-theme.conf", text)
+
+    def test_installer_derives_the_source_line_from_the_cli(self):
+        text = (ROOT / "install.sh").read_text()
+        self.assertIn('"$BIN_SRC" "${CLI_ARGS[@]}" paths', text)
+        self.assertIn('PATHS=', text)
+
+
 class RuntimeThemeResolution(unittest.TestCase):
     """HAZARD: the applied theme is a COPY at .../current/theme/colors.toml, so
     its name is not in the path. Resolving by name (or defaulting to a fixed

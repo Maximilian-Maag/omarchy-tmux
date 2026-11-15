@@ -105,5 +105,20 @@ bash "$HOOK" "Hackerman"; rc=$?
 if (( rc == 0 )); then ok "hook survives a source-file failure"; else bad "source-file failure aborted the hook (exit $rc)"; fi
 teardown
 
+# 8. a custom conf_path (via OMARCHY_TMUX_CONFIG) is the file regenerated AND
+#    reloaded — not the hardcoded default (kills the -n -> -z mutation on the
+#    config-override guard). Regression for #1.
+setup
+export OMARCHY_TMUX_DIR="$ROOT"
+export TMUX_RUNNING=0
+export OMARCHY_TMUX_CONFIG="$SANDBOX/custom.json"
+cat > "$OMARCHY_TMUX_CONFIG" <<'JSON'
+{ "conf_path": "tmux/custom-theme.conf" }
+JSON
+bash "$HOOK" "Hackerman"
+if [[ -f "$XDG_CONFIG_HOME/tmux/custom-theme.conf" ]]; then ok "override conf_path regenerated"; else bad "override conf_path ignored by theme"; fi
+if grep -q "custom-theme.conf" "$TMUX_LOG"; then ok "sourced the overridden conf_path"; else bad "reloaded the wrong (default) path"; fi
+teardown
+
 echo
 if (( fail == 0 )); then echo "shell: all $pass passed"; exit 0; else echo "shell: $fail failed"; exit 1; fi
