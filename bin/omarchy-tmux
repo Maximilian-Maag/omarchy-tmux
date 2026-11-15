@@ -332,7 +332,16 @@ def cmd_theme(args) -> int:
         print("omarchy-tmux: no applied theme at %s" % colors_path, file=sys.stderr)
         return 1
     colors = parse_colors(colors_path.read_text())
-    conf = build_conf(colors)
+    try:
+        conf = build_conf(colors)
+    except KeyError as exc:
+        # build_conf indexes required colours directly, so a colors.toml missing
+        # one aborted with a raw KeyError traceback. Name the missing key instead.
+        print("omarchy-tmux: applied theme is missing colour: %s" % exc.args[0], file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print("omarchy-tmux: applied theme is malformed: %s" % exc, file=sys.stderr)
+        return 1
     if args.stdout:
         sys.stdout.write(conf)
         return 0

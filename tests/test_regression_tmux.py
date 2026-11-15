@@ -5,6 +5,8 @@ Each test fails if the guard is removed, and names the hazard it pins.
 
 import importlib.machinery
 import importlib.util
+import contextlib
+import io
 import json
 import os
 import pathlib
@@ -251,6 +253,51 @@ class RuntimeThemeResolution(unittest.TestCase):
         src = CLI.read_text()
         self.assertIn("def resolve_theme_name", src)
         self.assertNotIn("catppuccin", src.lower())
+
+
+class MalformedColorsIsDiagnosed(unittest.TestCase):
+    """HAZARD: build_conf indexes required colours directly, so a malformed
+    colors.toml aborted `theme` with a raw KeyError traceback instead of the
+    plugin's own diagnostic.
+    """
+
+    def setUp(self):
+        self._state = tempfile.TemporaryDirectory()
+        self.addCleanup(self._state.cleanup)
+        self._old_state = os.environ.get("XDG_STATE_HOME")
+        os.environ["XDG_STATE_HOME"] = self._state.name
+        self.addCleanup(self._restore_state)
+        self.theme_dir = pathlib.Path(self._state.name) / "omarchy/current/theme"
+        self.theme_dir.mkdir(parents=True, exist_ok=True)
+
+    def _restore_state(self):
+        if self._old_state is None:
+            os.environ.pop("XDG_STATE_HOME", None)
+        else:
+            os.environ["XDG_STATE_HOME"] = self._old_state
+
+    def _run_theme(self):
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            rc = tmux.main(["theme", "--stdout"])
+        return rc, err.getvalue()
+
+    def test_missing_key_is_named_not_a_traceback(self):
+        (self.theme_dir / "colors.toml").write_text('mode = "dark"\naccent = "#82FB9C"\n')
+        rc, err = self._run_theme()
+        self.assertEqual(rc, 1)
+        self.assertIn("omarchy-tmux:", err)
+        self.assertIn("background", err)
+        self.assertNotIn("Traceback", err)
+
+    def test_unparseable_colour_is_diagnosed(self):
+        (self.theme_dir / "colors.toml").write_text(
+            'mode = "dark"\nbackground = "#0B0C16"\nforeground = "#ddf7ff"\n'
+            'accent = "not-a-colour"\n')
+        rc, err = self._run_theme()
+        self.assertEqual(rc, 1)
+        self.assertIn("omarchy-tmux:", err)
+        self.assertNotIn("Traceback", err)
 
 
 class AuthoritativeThemeName(unittest.TestCase):
