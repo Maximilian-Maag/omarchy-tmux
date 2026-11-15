@@ -45,6 +45,10 @@ DEFAULT_CONFIG = {
 # tmux style keywords that are bare flags rather than key=value pairs.
 FLAGS = ("bold", "italics", "underscore")
 
+# Placeholder in bin/bindings.lua replaced with the configured keybinding when
+# the Hyprland module is rendered (see render_bindings).
+KEYBINDING_TOKEN = "{{KEYBINDING}}"
+
 
 def state_home() -> pathlib.Path:
     """Omarchy's state root — where the applied theme lives."""
@@ -230,6 +234,23 @@ def build_conf(colors: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def keybinding(cfg: dict | None = None) -> str:
+    """The configured 'open tmux' chord (falls back to the built-in default)."""
+    cfg = cfg if cfg is not None else load_config()
+    return str(cfg.get("keybinding") or DEFAULT_CONFIG["keybinding"])
+
+
+def render_bindings(cfg: dict | None = None, template: str | None = None) -> str:
+    """Render bin/bindings.lua with the configured keybinding substituted.
+
+    ``template`` lets a caller pass the file contents (or a test fixture) instead
+    of reading bin/bindings.lua, so the render step is pure and testable.
+    """
+    if template is None:
+        template = (plugin_dir() / "bin" / "bindings.lua").read_text()
+    return template.replace(KEYBINDING_TOKEN, keybinding(cfg))
+
+
 def tmux_version() -> str:
     """The installed tmux version, or a sentinel when it is missing."""
     try:
@@ -261,6 +282,7 @@ def cmd_theme(args) -> int:
 
 
 def cmd_bindings(args) -> int:
+    cfg = load_config(args.config)
     src = plugin_dir() / "bin" / "bindings.lua"
     if not src.is_file():
         print("omarchy-tmux: bindings.lua not found at %s" % src, file=sys.stderr)
@@ -268,7 +290,7 @@ def cmd_bindings(args) -> int:
     hypr = config_home() / "hypr"
     hypr.mkdir(parents=True, exist_ok=True)
     dest = hypr / "tmux-bindings.lua"
-    dest.write_text(src.read_text())
+    dest.write_text(render_bindings(cfg, src.read_text()))
     require = 'require("hypr.tmux-bindings")'
     main = hypr / "hyprland.lua"
     if main.is_file():

@@ -96,6 +96,22 @@ class DedicatedConfPath(unittest.TestCase):
         self.assertIn('>> "$TMUX_CONF"', text)
 
 
+class KeybindingDrivesTheBinding(unittest.TestCase):
+    """HAZARD: config keybinding was printed by status only; the real binding
+    was a literal in bin/bindings.lua, so editing the config changed nothing.
+    The installed module must be rendered from the configured chord.
+    """
+
+    def test_bindings_template_carries_the_token(self):
+        self.assertIn("{{KEYBINDING}}", (ROOT / "bin/bindings.lua").read_text())
+
+    def test_render_uses_the_configured_chord(self):
+        out = tmux.render_bindings({"keybinding": "SUPER + SHIFT + Z"},
+                                   (ROOT / "bin/bindings.lua").read_text())
+        self.assertIn('o.bind("SUPER + SHIFT + Z"', out)
+        self.assertNotIn("{{KEYBINDING}}", out)
+
+
 class ConfPathSingleSourceOfTruth(unittest.TestCase):
     """HAZARD: conf_path was honoured by the CLI but hardcoded in the hook and
     install.sh, so an override regenerated a file the hook then failed to

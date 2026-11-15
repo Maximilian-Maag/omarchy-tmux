@@ -156,6 +156,21 @@ class ResolveThemeName(unittest.TestCase):
             self.assertEqual(tmux.resolve_theme_name({"a": "b"}, [root / "empty"]), "")
 
 
+class KeybindingAndRender(unittest.TestCase):
+    def test_default_keybinding(self):
+        self.assertEqual(tmux.keybinding({}), tmux.DEFAULT_CONFIG["keybinding"])
+
+    def test_render_substitutes_the_token(self):
+        out = tmux.render_bindings({"keybinding": "SUPER + SHIFT + Z"},
+                                   'x("{{KEYBINDING}}")\n')
+        self.assertIn("SUPER + SHIFT + Z", out)
+        self.assertNotIn("{{KEYBINDING}}", out)
+
+    def test_render_falls_back_to_default(self):
+        out = tmux.render_bindings({}, 'b("{{KEYBINDING}}")\n')
+        self.assertIn(tmux.DEFAULT_CONFIG["keybinding"], out)
+
+
 class BuildConf(unittest.TestCase):
     def test_uses_theme_colours(self):
         conf = tmux.build_conf(dict(COLORS))

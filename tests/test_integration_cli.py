@@ -117,6 +117,18 @@ class CliIntegration(unittest.TestCase):
         text = (hypr / "hyprland.lua").read_text()
         self.assertEqual(text.count('require("hypr.tmux-bindings")'), 1)
 
+    def test_bindings_render_the_configured_keybinding(self):
+        cfg = self.base / "tmux.json"
+        cfg.write_text(json.dumps({"keybinding": "SUPER + SHIFT + Z"}))
+        hypr = self.config / "hypr"
+        hypr.mkdir(parents=True)
+        (hypr / "hyprland.lua").write_text("-- main\n")
+        proc = self.run_cli("--config", str(cfg), "bindings")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        text = (hypr / "tmux-bindings.lua").read_text()
+        self.assertIn("SUPER + SHIFT + Z", text)
+        self.assertNotIn("{{KEYBINDING}}", text)
+
     def test_config_json_overrides_conf_path(self):
         cfg = self.base / "tmux.json"
         cfg.write_text(json.dumps({"conf_path": str(self.base / "elsewhere/theme.conf")}))

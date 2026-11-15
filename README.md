@@ -68,9 +68,11 @@ its `#rrggbb`.
 
 ## Keybinding
 
-`Super+Shift+Alt+T` opens (or re-attaches to) a tmux session in a floating
-terminal. It lives in `bin/bindings.lua` and is copied to
-`~/.config/hypr/tmux-bindings.lua`, required from `hyprland.lua`.
+`Super+Shift+Alt+T` (configurable via `keybinding` in `config/tmux.json`) opens
+(or re-attaches to) a tmux session in a floating terminal. `bin/bindings.lua` is
+a template; `omarchy-tmux bindings` (and `install.sh`) render it with the
+configured chord into `~/.config/hypr/tmux-bindings.lua`, required from
+`hyprland.lua`.
 
 ## Configuration
 
