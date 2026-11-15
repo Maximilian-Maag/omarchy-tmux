@@ -189,6 +189,21 @@ class GradientColourSafety(unittest.TestCase):
             tmux.tmux_colour("rgba(26a269ee) rgba(2ec27eee) 45deg")
 
 
+class ReadmeMatchesShippedConfig(unittest.TestCase):
+    """HAZARD: the README documented a conf_path (tilde) that differed from the
+    shipped relative one, so copying it verbatim ignored a non-default
+    $XDG_CONFIG_HOME.
+    """
+
+    def test_readme_conf_path_matches_the_shipped_config(self):
+        cfg = json.loads((ROOT / "config/tmux.json").read_text())
+        readme = (ROOT / "README.md").read_text()
+        self.assertIn('"conf_path": "%s"' % cfg["conf_path"], readme)
+
+    def test_readme_documents_no_tilde_conf_path(self):
+        self.assertNotIn('"conf_path": "~', (ROOT / "README.md").read_text())
+
+
 class ManifestContract(unittest.TestCase):
     """The policy check enforces this, but pin it here too so a rename fails
     loudly in the test suite as well.

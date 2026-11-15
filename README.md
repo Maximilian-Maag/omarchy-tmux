@@ -80,10 +80,13 @@ configured chord into `~/.config/hypr/tmux-bindings.lua`, required from
 
 ```json
 {
-  "conf_path": "~/.config/tmux/omarchy-theme.conf",
+  "conf_path": "tmux/omarchy-theme.conf",
   "keybinding": "SUPER + SHIFT + ALT + T"
 }
 ```
+
+`conf_path` is relative to `$XDG_CONFIG_HOME` (`~/.config` by default); an
+absolute path or one starting with `~` is used as-is.
 
 Override the config location with `omarchy-tmux --config <path> theme`.
 
