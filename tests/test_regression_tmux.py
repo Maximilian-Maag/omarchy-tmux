@@ -91,11 +91,33 @@ class DedicatedConfPath(unittest.TestCase):
 
     def test_install_only_appends_a_source_line(self):
         text = (ROOT / "install.sh").read_text()
-        self.assertIn('grep -q "omarchy-theme.conf"', text)
         self.assertIn("source-file", text)
         # Existing conf is appended to (>>), guarded by the grep above.
         self.assertIn('if [[ -f "$TMUX_CONF" ]]', text)
         self.assertIn('>> "$TMUX_CONF"', text)
+
+
+class SourceFileGuardIsPathAware(unittest.TestCase):
+    """HAZARD: the source-file guard matched the bare substring "omarchy-theme.conf"
+    on ANY path, so after a conf_path change the stale line was kept (the custom
+    path was never sourced) — and the reverse appended a duplicate. The guard must
+    compare the resolved path and reconcile the line.
+    """
+
+    def setUp(self):
+        self.text = (ROOT / "install.sh").read_text()
+
+    def test_guard_compares_the_resolved_source_line(self):
+        self.assertIn('grep -qF "$SOURCE_LINE"', self.text)
+
+    def test_no_cross_path_substring_guard(self):
+        # The blind substring match must be gone.
+        self.assertNotIn('grep -q "omarchy-theme.conf"', self.text)
+
+    def test_reconciles_a_previously_added_block(self):
+        # A marker comment lets the installer find and replace its own block.
+        self.assertIn("# omarchy-tmux theme", self.text)
+        self.assertIn("awk", self.text)
 
 
 class KeybindingDrivesTheBinding(unittest.TestCase):

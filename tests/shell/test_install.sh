@@ -93,5 +93,31 @@ else
   bad "install wrote the wrong source-file line"; cat "$TMUX_DIR/tmux.conf"
 fi
 
+# #6 both directions: changing conf_path must REPLACE the stale source line (not
+# keep it, and not append a duplicate). default -> custom -> default.
+printf '# user config\n' > "$TMUX_DIR/tmux.conf"
+bash "$INSTALL" >/dev/null 2>&1
+if grep -qF "source-file $TMUX_DIR/omarchy-theme.conf" "$TMUX_DIR/tmux.conf"; then
+  ok "default conf_path sourced"
+else
+  bad "default conf_path not sourced"; cat "$TMUX_DIR/tmux.conf"
+fi
+OMARCHY_TMUX_CONFIG="$CUSTOM_CONF" bash "$INSTALL" >/dev/null 2>&1
+if grep -q "omarchy-theme.conf" "$TMUX_DIR/tmux.conf" && ! grep -q "custom-theme.conf" "$TMUX_DIR/tmux.conf"; then
+  bad "conf_path change left the stale default line"; cat "$TMUX_DIR/tmux.conf"
+else
+  ok "conf_path change reconciled the stale default line"
+fi
+n="$(grep -c "omarchy-theme.conf" "$TMUX_DIR/tmux.conf")"
+if (( n == 0 )); then ok "no duplicate default line after conf_path change"; else bad "stale default line kept ($n)"; fi
+bash "$INSTALL" >/dev/null 2>&1
+if grep -qF "source-file $TMUX_DIR/omarchy-theme.conf" "$TMUX_DIR/tmux.conf" && ! grep -q "custom-theme.conf" "$TMUX_DIR/tmux.conf"; then
+  ok "conf_path reverted back to default"
+else
+  bad "reverting conf_path left the custom line"; cat "$TMUX_DIR/tmux.conf"
+fi
+n="$(grep -c "source-file" "$TMUX_DIR/tmux.conf")"
+if (( n == 1 )); then ok "exactly one source-file line after two changes"; else bad "wrong source-file count ($n)"; cat "$TMUX_DIR/tmux.conf"; fi
+
 echo
 if (( fail == 0 )); then echo "shell: all $pass passed"; exit 0; else echo "shell: $fail failed"; exit 1; fi

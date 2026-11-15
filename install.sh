@@ -52,7 +52,19 @@ fi
 SOURCE_LINE="source-file $CONF_PATH"
 mkdir -p "$TMUX_DIR"
 if [[ -f "$TMUX_CONF" ]]; then
-  if grep -qF "$SOURCE_LINE" "$TMUX_CONF" || grep -q "omarchy-theme.conf" "$TMUX_CONF"; then
+  # Reconcile, don't just guard: drop any block WE previously added — our marker
+  # comment and the source-file line directly after it — so a conf_path change
+  # replaces the stale line instead of leaving tmux sourcing the old path (or
+  # appending a duplicate). A source-file line the user wrote themselves carries
+  # no marker and is left untouched.
+  tmp="$(mktemp)"
+  awk '
+    /^# omarchy-tmux theme$/ { skip=1; next }
+    skip { skip=0; next }
+    { print }
+  ' "$TMUX_CONF" > "$tmp"
+  mv "$tmp" "$TMUX_CONF"
+  if grep -qF "$SOURCE_LINE" "$TMUX_CONF"; then
     echo "  tmux.conf already sources $CONF_PATH."
   else
     printf '\n# omarchy-tmux theme\n%s\n' "$SOURCE_LINE" >> "$TMUX_CONF"
