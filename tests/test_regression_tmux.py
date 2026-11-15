@@ -114,6 +114,47 @@ class KeybindingDrivesTheBinding(unittest.TestCase):
         self.assertNotIn("{{KEYBINDING}}", out)
 
 
+class KeybindingCannotInjectLua(unittest.TestCase):
+    """HAZARD: the configured keybinding is substituted into a double-quoted Lua
+    string literal in bin/bindings.lua. A value carrying a quote, backslash or
+    newline would close the literal and inject Lua the compositor then executes.
+    It must be refused, not rendered.
+    """
+
+    HOSTILE = [
+        'D", dofile("/etc/passwd")\n--',
+        "SUPER + \\ + T",
+        "SUPER + T\nmalicious()",
+        "SUPER + ' + T",
+    ]
+
+    def test_hostile_keybinding_is_refused(self):
+        template = (ROOT / "bin/bindings.lua").read_text()
+        for value in self.HOSTILE:
+            with self.assertRaises(ValueError):
+                tmux.render_bindings({"keybinding": value}, template)
+
+    def test_validate_keybinding_is_the_guard(self):
+        for value in self.HOSTILE:
+            with self.assertRaises(ValueError):
+                tmux.validate_keybinding(value)
+
+    def test_hostile_value_never_reaches_the_module(self):
+        template = (ROOT / "bin/bindings.lua").read_text()
+        for value in self.HOSTILE:
+            try:
+                rendered = tmux.render_bindings({"keybinding": value}, template)
+            except ValueError:
+                continue
+            self.fail("hostile keybinding was rendered: %r" % rendered)
+
+    def test_clean_keybinding_still_renders(self):
+        out = tmux.render_bindings({"keybinding": "SUPER + SHIFT + Z"},
+                                   (ROOT / "bin/bindings.lua").read_text())
+        self.assertIn('o.bind("SUPER + SHIFT + Z"', out)
+        self.assertNotIn("{{KEYBINDING}}", out)
+
+
 class ConfPathSingleSourceOfTruth(unittest.TestCase):
     """HAZARD: conf_path was honoured by the CLI but hardcoded in the hook and
     install.sh, so an override regenerated a file the hook then failed to
