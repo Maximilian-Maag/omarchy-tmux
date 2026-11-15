@@ -6,8 +6,10 @@ Each test fails if the guard is removed, and names the hazard it pins.
 import importlib.machinery
 import importlib.util
 import json
+import os
 import pathlib
 import re
+import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -145,6 +147,32 @@ class RuntimeThemeResolution(unittest.TestCase):
         src = CLI.read_text()
         self.assertIn("def resolve_theme_name", src)
         self.assertNotIn("catppuccin", src.lower())
+
+
+class AuthoritativeThemeName(unittest.TestCase):
+    """HAZARD: the theme name was resolved only by whole-file colour equality,
+    so a non-catalogued theme (or one differing in a key) showed '(unknown)'.
+    Omarchy writes the applied name to current/theme.name — consult it first.
+    """
+
+    def test_resolver_consults_the_live_name_file(self):
+        src = CLI.read_text()
+        self.assertIn("theme.name", src)
+        self.assertIn("def omarchy_theme_name", src)
+
+    def test_non_catalogued_name_resolves_to_that_name(self):
+        with tempfile.TemporaryDirectory() as t:
+            state = pathlib.Path(t)
+            (state / "omarchy/current").mkdir(parents=True)
+            (state / "omarchy/current/theme.name").write_text("my-custom-theme\n")
+            old = os.environ.get("XDG_STATE_HOME")
+            os.environ["XDG_STATE_HOME"] = str(state)
+            try:
+                self.assertEqual(tmux.resolve_theme_name({}, []), "my-custom-theme")
+            finally:
+                os.environ.pop("XDG_STATE_HOME", None)
+                if old is not None:
+                    os.environ["XDG_STATE_HOME"] = old
 
 
 class GradientColourSafety(unittest.TestCase):

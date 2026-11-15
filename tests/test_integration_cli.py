@@ -99,6 +99,13 @@ class CliIntegration(unittest.TestCase):
         self.assertIn("applied theme", proc.stdout)
         self.assertIn("keybinding", proc.stdout)
 
+    def test_status_uses_the_live_theme_name(self):
+        (self.state / "omarchy/current/theme.name").write_text("my-custom-theme\n")
+        proc = self.run_cli("status")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("my-custom-theme", proc.stdout)
+        self.assertNotIn("(unknown)", proc.stdout)
+
     def test_bindings_wires_hyprland(self):
         hypr = self.config / "hypr"
         hypr.mkdir(parents=True)
