@@ -95,4 +95,4 @@ fi
 
 echo ""
 echo "Done. Try:  omarchy-tmux theme   /   omarchy-tmux status"
-echo "Reload tmux with:  tmux source-file ~/.config/tmux/omarchy-theme.conf"
+echo "Reload tmux with:  tmux source-file $CONF_PATH"

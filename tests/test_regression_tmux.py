@@ -355,6 +355,21 @@ class ReadmeMatchesShippedConfig(unittest.TestCase):
         self.assertNotIn('"conf_path": "~', (ROOT / "README.md").read_text())
 
 
+class FinalHintUsesResolvedConfPath(unittest.TestCase):
+    """HAZARD: the closing 'reload' hint hardcoded the default conf path, so after
+    a conf_path override it pointed at the wrong file.
+    """
+
+    def setUp(self):
+        self.text = (ROOT / "install.sh").read_text()
+
+    def test_hint_uses_the_resolved_conf_path(self):
+        self.assertIn("tmux source-file $CONF_PATH", self.text)
+
+    def test_hint_does_not_hardcode_the_default_path(self):
+        self.assertNotIn("tmux source-file ~/.config/tmux", self.text)
+
+
 class ManifestContract(unittest.TestCase):
     """The policy check enforces this, but pin it here too so a rename fails
     loudly in the test suite as well.

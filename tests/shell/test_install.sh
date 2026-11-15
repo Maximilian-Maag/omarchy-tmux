@@ -119,5 +119,14 @@ fi
 n="$(grep -c "source-file" "$TMUX_DIR/tmux.conf")"
 if (( n == 1 )); then ok "exactly one source-file line after two changes"; else bad "wrong source-file count ($n)"; cat "$TMUX_DIR/tmux.conf"; fi
 
+# #10: the closing "reload" hint must point at the resolved conf_path, not the
+# hardcoded default, so an override is not mis-reported.
+OMARCHY_TMUX_CONFIG="$CUSTOM_CONF" bash "$INSTALL" >"$SANDBOX/install4.log" 2>&1
+if grep -q "Reload tmux with:  tmux source-file $XDG_CONFIG_HOME/tmux/custom-theme.conf" "$SANDBOX/install4.log"; then
+  ok "final hint uses the resolved conf_path"
+else
+  bad "final hint hardcoded a path"; grep "Reload tmux" "$SANDBOX/install4.log"
+fi
+
 echo
 if (( fail == 0 )); then echo "shell: all $pass passed"; exit 0; else echo "shell: $fail failed"; exit 1; fi
