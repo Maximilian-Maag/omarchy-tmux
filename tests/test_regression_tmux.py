@@ -196,6 +196,47 @@ class ConfPathSingleSourceOfTruth(unittest.TestCase):
         self.assertIn('PATHS=', text)
 
 
+class TmuxVersionCallIsBounded(unittest.TestCase):
+    """HAZARD: tmux_version() ran a subprocess with no timeout, unlike docker's
+    30s seam, so a wedged tmux could hang status/install forever.
+    """
+
+    def test_default_timeout_is_thirty_seconds(self):
+        self.assertEqual(tmux.DEFAULT_TIMEOUT, 30)
+
+    def test_version_call_passes_the_timeout(self):
+        captured = {}
+
+        def fake(argv, **kwargs):
+            captured["argv"] = argv
+            captured["kwargs"] = kwargs
+
+            class Result:
+                stdout = "tmux 3.4\n"
+            return Result()
+
+        real = tmux.subprocess.run
+        tmux.subprocess.run = fake
+        try:
+            self.assertEqual(tmux.tmux_version(), "tmux 3.4")
+        finally:
+            tmux.subprocess.run = real
+        self.assertEqual(captured["argv"], ["tmux", "-V"])
+        self.assertEqual(captured["kwargs"].get("timeout"), tmux.DEFAULT_TIMEOUT)
+        self.assertEqual(captured["kwargs"].get("timeout"), 30)
+
+    def test_a_timed_out_call_is_reported_not_raised(self):
+        def boom(argv, **kwargs):
+            raise tmux.subprocess.TimeoutExpired(argv, kwargs.get("timeout"))
+
+        real = tmux.subprocess.run
+        tmux.subprocess.run = boom
+        try:
+            self.assertEqual(tmux.tmux_version(), "not installed")
+        finally:
+            tmux.subprocess.run = real
+
+
 class RuntimeThemeResolution(unittest.TestCase):
     """HAZARD: the applied theme is a COPY at .../current/theme/colors.toml, so
     its name is not in the path. Resolving by name (or defaulting to a fixed
