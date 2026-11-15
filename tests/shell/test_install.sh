@@ -128,5 +128,125 @@ else
   bad "final hint hardcoded a path"; grep "Reload tmux" "$SANDBOX/install4.log"
 fi
 
+# ── uninstall ─────────────────────────────────────────────────────────────────
+# A dedicated, writable bin dir so the CLI symlink is exercised end to end without
+# root: OMARCHY_TMUX_BIN points install and uninstall at it, and the sudo stub is
+# made to actually run the command it is handed (the dir needs no privilege).
+cat > "$BIN/sudo" <<'SUDO'
+#!/bin/bash
+exec "$@"
+SUDO
+chmod +x "$BIN/sudo"
+export OMARCHY_TMUX_BIN="$SANDBOX/localbin"
+mkdir -p "$OMARCHY_TMUX_BIN"
+
+# The user's own tmux.conf and hyprland.lua (the latter with a require line they
+# added by hand for a module that is not ours), plus a manually-placed theme-set
+# hook — what `omarchy hook install` would have written.
+printf '# my precious config\nset -g mouse on\n' > "$TMUX_DIR/tmux.conf"
+printf -- '-- my own hyprland.lua\nhl.monitor({ output = "eDP-1" })\nrequire("hypr.my-own-module")\n' \
+  > "$XDG_CONFIG_HOME/hypr/hyprland.lua"
+mkdir -p "$XDG_CONFIG_HOME/omarchy/hooks/theme-set.d"
+printf '#!/bin/bash\n' > "$XDG_CONFIG_HOME/omarchy/hooks/theme-set.d/tmux-theme-set"
+before_tmux="$(sha256sum "$TMUX_DIR/tmux.conf" | cut -d' ' -f1)"
+before_hypr="$(sha256sum "$XDG_CONFIG_HOME/hypr/hyprland.lua" | cut -d' ' -f1)"
+
+bash "$INSTALL" >"$SANDBOX/install-u.log" 2>&1
+if [[ -L "$OMARCHY_TMUX_BIN/omarchy-tmux" ]] \
+   && [[ "$(readlink -f "$OMARCHY_TMUX_BIN/omarchy-tmux")" == "$ROOT/bin/omarchy-tmux" ]]; then
+  ok "install links the CLI into the override bin dir"
+else
+  bad "CLI not linked into the override bin dir"; cat "$SANDBOX/install-u.log"
+fi
+
+bash "$INSTALL" --uninstall >"$SANDBOX/uninstall.log" 2>&1
+rc=$?
+if (( rc == 0 )); then ok "uninstall exit 0"; else bad "uninstall exit $rc"; cat "$SANDBOX/uninstall.log"; fi
+
+if [[ ! -e "$OMARCHY_TMUX_BIN/omarchy-tmux" ]]; then
+  ok "the CLI symlink is removed"
+else
+  bad "CLI symlink survived the uninstall"
+fi
+
+if [[ "$(sha256sum "$XDG_CONFIG_HOME/hypr/hyprland.lua" | cut -d' ' -f1)" == "$before_hypr" ]]; then
+  ok "install/uninstall round-trip leaves hyprland.lua byte-identical"
+else
+  bad "hyprland.lua changed across the round-trip"; cat "$XDG_CONFIG_HOME/hypr/hyprland.lua"
+fi
+if [[ "$(sha256sum "$TMUX_DIR/tmux.conf" | cut -d' ' -f1)" == "$before_tmux" ]]; then
+  ok "install/uninstall round-trip leaves tmux.conf byte-identical"
+else
+  bad "tmux.conf changed across the round-trip"; cat "$TMUX_DIR/tmux.conf"
+fi
+n="$(grep -c -- '-- omarchy-tmux keybindings' "$XDG_CONFIG_HOME/hypr/hyprland.lua" || true)"
+if (( n == 0 )); then ok "no keybindings marker is left behind"; else bad "marker left behind ($n)"; fi
+if grep -q 'hypr.my-own-module' "$XDG_CONFIG_HOME/hypr/hyprland.lua"; then
+  ok "a hand-added require line survives the uninstall"
+else
+  bad "the user's hand-added require line was removed"
+fi
+if grep -q 'my precious config' "$TMUX_DIR/tmux.conf" && ! grep -q 'source-file' "$TMUX_DIR/tmux.conf"; then
+  ok "the user's own tmux.conf survives with our source line gone"
+else
+  bad "the user's tmux.conf was not restored"; cat "$TMUX_DIR/tmux.conf"
+fi
+
+if [[ ! -e "$XDG_CONFIG_HOME/hypr/tmux-bindings.lua" ]]; then
+  ok "the rendered bindings module is removed"
+else
+  bad "bindings module survived the uninstall"
+fi
+if [[ ! -e "$XDG_CONFIG_HOME/omarchy/hooks/theme-set.d/tmux-theme-set" ]]; then
+  ok "the theme-set hook is removed"
+else
+  bad "theme-set hook survived the uninstall"
+fi
+
+# The generated theme conf is NOT an install artifact to reverse — the theme-set
+# hook regenerates it, so an uninstall must leave it where it is.
+if [[ -f "$TMUX_DIR/omarchy-theme.conf" ]]; then
+  bash "$INSTALL" >/dev/null 2>&1
+  bash "$INSTALL" --uninstall >/dev/null 2>&1
+  if [[ -f "$TMUX_DIR/omarchy-theme.conf" ]]; then
+    ok "the generated theme conf is left alone by an uninstall"
+  else
+    bad "uninstall removed the generated theme conf"
+  fi
+fi
+
+# A symlink that points somewhere else is not ours: the uninstall says so and leaves it.
+ln -sfn /bin/true "$OMARCHY_TMUX_BIN/omarchy-tmux"
+out="$(bash "$INSTALL" --uninstall 2>&1)"
+if [[ "$(readlink "$OMARCHY_TMUX_BIN/omarchy-tmux")" == "/bin/true" ]]; then
+  ok "a foreign symlink is left alone"
+else
+  bad "uninstall touched a foreign symlink"
+fi
+if [[ $out == *"not a link into this checkout"* ]]; then
+  ok "and the refusal is reported"
+else
+  bad "uninstall did not say why it left the foreign symlink"; printf '%s\n' "$out"
+fi
+rm -f "$OMARCHY_TMUX_BIN/omarchy-tmux"
+
+# A bare require line for OUR module, added by hand with no marker above it, is the
+# user's own line — install never writes one without the marker — so it survives too,
+# and the config comes back byte-identical.
+printf -- '-- my own hyprland.lua\nrequire("hypr.tmux-bindings")\n' \
+  > "$XDG_CONFIG_HOME/hypr/hyprland.lua"
+before2="$(sha256sum "$XDG_CONFIG_HOME/hypr/hyprland.lua" | cut -d' ' -f1)"
+bash "$INSTALL" >/dev/null 2>&1
+bash "$INSTALL" --uninstall >/dev/null 2>&1
+if [[ "$(sha256sum "$XDG_CONFIG_HOME/hypr/hyprland.lua" | cut -d' ' -f1)" == "$before2" ]]; then
+  ok "a hand-added bare require line survives the round-trip too"
+else
+  bad "a hand-added bare require line was removed"; cat "$XDG_CONFIG_HOME/hypr/hyprland.lua"
+fi
+
+# Uninstalling when nothing is installed is not an error (idempotent teardown).
+bash "$INSTALL" --uninstall >/dev/null 2>&1
+if (( $? == 0 )); then ok "uninstalling nothing succeeds"; else bad "uninstalling nothing failed"; fi
+
 echo
 if (( fail == 0 )); then echo "shell: all $pass passed"; exit 0; else echo "shell: $fail failed"; exit 1; fi

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "Maximilian-Maag.tmux",
   "name": "Tmux",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Maximilian-Maag",
   "license": "MIT",
   "description": "Themes the installed tmux from the applied Omarchy theme: reads the live colors.toml and generates a tmux theme conf (status bar, active/inactive window, selection, accent) that your own tmux.conf sources, plus a Hyprland keybinding.",
